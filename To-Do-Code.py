@@ -3,7 +3,7 @@ import sys
 import pickle
 import os
 import msvcrt
-import pyperclip
+from prompt_toolkit import prompt
 #   ignore
 '''-----------------------------------------------------------------------------------------------------'''
 list_of_all_todos = []
@@ -15,17 +15,21 @@ except FileNotFoundError:
         print("File Not found - Keine Listen gefunden")
 '''-----------------------------------------------------------------------------------------------------'''
 #sidequests
-
 def back_to_main_menu():
     print("Drücken Sie eine beliebige Taste, um zum Hauptmenü zurückzukehren.")
     msvcrt.getch()  
     print() 
 
-def copy_to_clipboard(string):
-    pyperclip.copy(string)
-
+def safe_changes():
+    try: 
+        pickle.dump(list_of_all_todos, open(os.path.join(path, "todolists.pkl"), "wb"))
+        print('\nÄnderungen erfolgreich gespeichert!')
+        back_to_main_menu()
+    except Exception:
+        print("\nÄnderungen konnten nicht gespeichert werden!")
+        back_to_main_menu()
+ 
 #main menu stuff
-
 def create_new_todo():
     print(80*'-','\n')
     choice_name=input('Gib deiner Liste einen Namen\n>>>')
@@ -42,7 +46,15 @@ def create_new_todo():
     tupel_new_list=(name_new_list, list_new_list)
     list_of_all_todos.append(tupel_new_list)
     show_all_todos()
-    back_to_main_menu()
+    while True:
+            print('Möchtest du eine weitere Liste erstellen?\n\t[0] Ja\n\t[1] Nein, zurück zum Hauptmenu\n')
+            match msvcrt.getch():
+                case b'0':  
+                    return create_new_todo()
+                case b'1':
+                    break
+                case _:
+                    print("Ungültige Eingabe")
 
 def show_all_todos():
     print(80*'-','\n')
@@ -63,17 +75,19 @@ def show_all_todos():
                 case b'0':  
                     return create_new_todo()
                 case b'1':
-                    pass
+                    break
                 case _:
                     print("Ungültige Eingabe")
     
 def edit_todo():
     while True:
         show_all_todos()
-        print('Welche Liste möchtest du bearbeiten?')
+        print('Welche Liste möchtest du bearbeiten? (Drücke 0, um zurück zum Hauptmenu gelangen)')
         while msvcrt.kbhit():   #damit der Puffer geleert wird und bei falscher Eingabe eine erneute Eingbe mögl. ist
             msvcrt.getch()
         choice_to_edit=msvcrt.getch()
+        if choice_to_edit==b'0':
+            break
         try:
             choice_to_edit=int(choice_to_edit)-1
             if choice_to_edit in range(len(list_of_all_todos)):
@@ -120,8 +134,8 @@ def edit_todo():
                                                             print('Ungültige Eingabe')
                                             break           
                                         case b'1':
-                                            print('Du hast keine Änderungen vorgenommen!')
-                                            break
+                                            back_to_main_menu()
+                                            return main_menu()
                                         case _:
                                             print('Ungültige Eingabe') 
                                 break
@@ -133,13 +147,18 @@ def edit_todo():
                             print(f'\nListe {chosen_list_name} wurde geupdated!\n')
                             for index, unterpunkt in enumerate(chosen_list_list, start=1):
                                 print(f'\t[{index}]: {unterpunkt}')
-                            print('\nVergiss nicht, die App ordentlich zu schließen.\nNur so werden alle Änderungen gespeichert!\n')
-                            back_to_main_menu()
                             break
                         case b'3':
-                            aspect_to_edit=(int(input('Welchen Unterpunkt möchtest du bearbeiten? Gib einen Index an!\n>>>'))-1)
-                            copy_to_clipboard(chosen_list_list[aspect_to_edit])
-                            aspect_edited=input(f'Du kannst {chosen_list_list[aspect_to_edit]} nun bearbeiten!\n\t>>>', pyperclip.paste())
+                            while True:
+                                try:
+                                    aspect_to_edit = (int(input('Welchen Unterpunkt möchtest du bearbeiten? Gib einen Index an!\n>>>'))-1)
+                                    if aspect_to_edit > 0 and aspect_to_edit <= len(chosen_list_list):
+                                        break
+                                    else:
+                                        print("Ungültiger Eingabe. Wähle einen gültigen Index")
+                                except ValueError:
+                                    print("Ungültige Eingabe. Achte auf korrekte Indexierung.")
+                            aspect_edited=prompt("Bearbeite deinen Unterpunkt: ", default=chosen_list_list[aspect_to_edit])
                             chosen_list_list[aspect_to_edit]=aspect_edited
                             print('Die Änderung wurde übernommen!\nHier deine aktualisierte Liste\n')
                             print(chosen_list_name)
@@ -155,32 +174,48 @@ def edit_todo():
         except Exception:
             print('Ungültige Eingabe!\nStelle sicher, dass du die entsprechenden Indizes verwendest')
 
-
 def delete_todo():
     show_all_todos()
-    to_delete=int(input('Welche Liste möchtest du entfernen? \n>>>'))
-    while True:
-        check_before_delete=int(input(f'Möchtest du Liste Nr. {to_delete} wirklich entfernen?\n    [0] Ja\n    [1] Nein\n>>>'))
-        match check_before_delete:
-            case 0:
+    print('Welche Liste möchtest du entfernen? Drücke (0), um zurück zum Hauptmenu zu gelangen')
+    to_delete=int(msvcrt.getch())
+    if to_delete != 0:
+        while True:
+            while True:
+                print(f'Möchtest du Liste Nr. {to_delete} wirklich entfernen?\n    [0] Ja\n    [1] Nein\n>>>')
                 try:
-                    del list_of_all_todos[to_delete-1]
-                    return show_all_todos()
-                except IndexError:
-                    print('Ungültige Eingabe')
-                    return delete_todo()
-            case 1:
-                while True:
-                    print('Möchtest du\n\t[0] eine andere Liste löschen\n\t[1] zurück zum Hauptmenü\n>>>')
-                    match msvcrt.getch():
-                        case b'0':
-                            return delete_todo()
-                        case b'1':
-                            break
-                        case _:
-                            print('Ungültige Eingabe')
-            case _:
-                print('Ungültige Eingabe')            
+                    check_before_delete=int(msvcrt.getch())
+                    break
+                except Exception:
+                    print('Ungültiger Input!')
+            match check_before_delete:
+                case 0:
+                    try:
+                        del list_of_all_todos[to_delete-1]
+                        while True and list_of_all_todos!=[]:
+                            print('Möchtest du eine weitere Liste löschen?\n\t[0] Ja\n\t[1] Nein')
+                            match msvcrt.getch():
+                                case b'0':
+                                    return delete_todo()
+                                case b'1':
+                                    return show_all_todos()
+                                case _:
+                                    print('Ungültige Eingabe')
+                    except IndexError:
+                        print('Ungültige Eingabe')
+                        return delete_todo()
+                case 1:
+                    while True:
+                        print('Möchtest du\n\t[0] eine andere Liste löschen\n\t[1] zurück zum Hauptmenü\n')
+                        match msvcrt.getch():
+                            case b'0':
+                                return delete_todo()
+                            case b'1':
+                                break
+                            case _:
+                                print('Ungültige Eingabe')       
+                    break  
+                case _:
+                    print('Ungültige Eingabe')            
 
 def main_menu():
     while True:
@@ -189,12 +224,16 @@ def main_menu():
         match msvcrt.getch():
             case b'1':
                 create_new_todo()
+                safe_changes()
             case b'2':
                 show_all_todos()
+                back_to_main_menu()
             case b'3':
                 edit_todo()
+                safe_changes()
             case b'4':
                 delete_todo()
+                safe_changes()
             case b'5':
                 pickle.dump(list_of_all_todos, open(os.path.join(path, "todolists.pkl"), "wb"))
                 break
